@@ -56,14 +56,56 @@ app.on('ready', function () {
   }
 
   /**
-   * Open the app
+   * Load configured URL
+   *
+   * If the config file doesn't exist, load an error message for the user.
    */
-  if (env.name === 'test') {
-    mainWindow.loadURL('file://' + __dirname + '/spec.html');
+  const configFile = '/usr/local/etc/kiosk/config.json';
+  const configFileObj = jetpack.read(configFile, 'json');
+  console.log('configFileObj: ', configFileObj);
+  if (configFileObj !== null) {
+    loadConfigUrl(configFileObj);
   } else {
-    const configFile = '/usr/local/etc/kiosk/config.json';
-    loadWindowConfigFile(configFile);
+    console.log('Config file [' + configFile + '] not present.');
+    mainWindow.loadURL('file://' + __dirname + '/config-error.html');
   }
+
+  /**
+   * Check to see if any load failed
+   *
+   * If the page isn't available, then we display a local error page
+   * wait a few seconds, and then try loading the page again.
+   */
+  var loadAttempts = 0;
+  mainWindow.webContents.on('did-fail-load', function (event, errorCode) {
+
+    // Log load attempts
+    loadAttempts += 1;
+    console.log('Failed to load configured URL on attempt: ' + loadAttempts);
+
+    // Display the local error screen
+    mainWindow.loadURL('file://' + __dirname + '/launch-delay.html');
+
+    // Wait 5 seconds and then try to load the page again.
+    setTimeout(function () {
+      loadConfigUrl(configFileObj);
+    }, 5000);
+  });
+
+  /**
+   * Report HTTP response codes
+   */
+  mainWindow.webContents.on('did-get-response-details', function (
+    event, status, newURL, originalURL, httpResponseCode) {
+    console.log('httpResponseCode - ' + httpResponseCode + '\n');
+  });
+
+  /**
+   * Finished a load
+   */
+  mainWindow.webContents.on('did-finish-load', function () {
+    console.log('Finished loading');
+  });
 
   /**
    * Keyboard shortcuts
@@ -74,55 +116,16 @@ app.on('ready', function () {
    * app on quit. For maintenance, we probably just need to be able to get
    * to the Finder while the application remains running in the background.
    */
-  const retQuit = globalShortcut.register('CommandOrControl+F', () => {
-    console.log('Switching to Finder');
-    promisedExec('open -a Finder');
-  });
-  if (!retQuit) {
-    console.log('Quit keyboard registration failed');
-  }
   const retReload = globalShortcut.register('CommandOrControl+R', () => {
     console.log('Reload the page');
     mainWindow.reload();
   });
-  if (!retReload) {
-    console.log('Reload keyboard registration failed');
-  }
 
 });
 
-function loadWindowConfigFile(configFile) {
-  const configFileObj = jetpack.read(configFile, 'json');
-  console.log('configFileObj: ', configFileObj);
-  if (configFileObj !== null) {
-    loadWindowUptimeDelay(configFileObj);
-  } else {
-    console.log('Config file [' + configFile + '] not present.');
-    mainWindow.loadURL('file://' + __dirname + '/config-error.html');
-  }
-}
-
-function loadWindowUptimeDelay(configFileObj) {
-  // Seconds since launch, when it will be safe to load the URL
-  const nominalUptime = 300;
-
-  // Seconds to wait if we are not in the nominal uptime window
-  const launchDelay = 60;
-
-  console.log('os.uptime(): ', os.uptime());
-  console.log('nominalUptime: ', nominalUptime);
-
-  if (os.uptime() > nominalUptime) {
-    console.log('Launching immediately');
-    mainWindow.loadURL(configFileObj.url);
-  } else {
-    console.log('Delaying launch ' + launchDelay + ' seconds');
-    mainWindow.loadURL('file://' + __dirname + '/launch-delay.html');
-    setTimeout(function () {
-      mainWindow.loadURL(configFileObj.url);
-    }, launchDelay * 1000);
-  }
-
+function loadConfigUrl(configFileObj) {
+  console.log('Loading config URL');
+  mainWindow.loadURL(configFileObj.mainWindowUrl);
 }
 
 app.on('window-all-closed', function () {
