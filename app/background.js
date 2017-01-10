@@ -125,7 +125,7 @@ app.on('ready', function () {
 
 function loadConfigUrl(configFileObj) {
   console.log('Loading config URL');
-  mainWindow.loadURL(configFileObj.mainWindowUrl);
+  mainWindow.loadURL(configFileObj.url);
 }
 
 app.on('window-all-closed', function () {
