@@ -29,8 +29,8 @@ app.on('ready', function () {
   mainWindow = new BrowserWindow({
     x: 0,
     y: 0,
-    width: 800,
-    height: 600,
+    width: 1080,
+    height: 1920,
   });
 
   /**
